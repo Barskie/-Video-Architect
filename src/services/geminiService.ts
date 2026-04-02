@@ -1,9 +1,27 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { VideoBlueprint } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const apiKey = process.env.GEMINI_API_KEY;
+const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+
+function isVideoBlueprint(value: unknown): value is VideoBlueprint {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const data = value as VideoBlueprint;
+  return (
+    typeof data.title === "string" &&
+    typeof data.overallTone === "string" &&
+    Array.isArray(data.segments)
+  );
+}
 
 export async function analyzeScript(script: string): Promise<VideoBlueprint> {
+  if (!apiKey) {
+    throw new Error("Missing GEMINI_API_KEY. Add it to your .env.local file.");
+  }
+
   const response = await ai.models.generateContent({
     model: "gemini-3.1-pro-preview",
     contents: `Act as a High-Speed Video Production Architect. 
@@ -65,7 +83,11 @@ export async function analyzeScript(script: string): Promise<VideoBlueprint> {
   });
 
   try {
-    return JSON.parse(response.text || "{}") as VideoBlueprint;
+    const parsed = JSON.parse(response.text || "{}");
+    if (!isVideoBlueprint(parsed)) {
+      throw new Error("Gemini response shape did not match VideoBlueprint.");
+    }
+    return parsed;
   } catch (e) {
     console.error("Failed to parse Gemini response", e);
     throw new Error("Failed to analyze script");
