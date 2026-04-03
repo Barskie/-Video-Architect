@@ -42,7 +42,7 @@ export default function App() {
       const result = await analyzeScript(script);
       setBlueprint(result);
     } catch (err) {
-      setError('Failed to analyze script. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to analyze script. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -190,7 +190,7 @@ export default function App() {
 
                   {blueprint.segments.map((seg, i) => (
                     <motion.div
-                      key={i}
+                      key={`${seg.timestamp}-${i}`}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.1 }}
@@ -226,13 +226,13 @@ export default function App() {
                           ))}
                         </div>
                         <div className="grid grid-cols-1 gap-2">
-                          <a href={seg.searchLinks.youtube} target="_blank" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
+                          <a href={seg.searchLinks.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
                             <Search className="w-3 h-3" /> YouTube (4K)
                           </a>
-                          <a href={seg.searchLinks.movieClips} target="_blank" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
+                          <a href={seg.searchLinks.movieClips} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
                             <Search className="w-3 h-3" /> Movie Scenes
                           </a>
-                          <a href={seg.searchLinks.pexels} target="_blank" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
+                          <a href={seg.searchLinks.pexels} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
                             <Search className="w-3 h-3" /> Pexels Stock
                           </a>
                         </div>
@@ -240,10 +240,10 @@ export default function App() {
 
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <a href={seg.searchLinks.tiktok} target="_blank" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
+                          <a href={seg.searchLinks.tiktok} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
                             <Search className="w-3 h-3" /> TikTok Memes
                           </a>
-                          <a href={seg.searchLinks.giphy} target="_blank" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
+                          <a href={seg.searchLinks.giphy} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase hover:text-[#00FF00] transition-colors">
                             <Search className="w-3 h-3" /> Giphy Reaction
                           </a>
                         </div>
