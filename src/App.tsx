@@ -3,24 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Video, 
-  Zap, 
-  Download, 
-  Search, 
-  Music, 
-  Sparkles, 
-  ExternalLink,
-  ChevronRight,
+import {
+  Video,
+  Zap,
+  Search,
+  Music,
+  Sparkles,
   FileJson,
   FileCode,
   Loader2
 } from 'lucide-react';
 import { analyzeScript } from './services/geminiService';
 import { VideoBlueprint } from './types';
-import { generateEDL, generateXML, downloadFile } from './utils/exportUtils';
+import { generateEDL, generateXML, downloadFile, sanitizeFileName } from './utils/exportUtils';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -33,6 +30,17 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [blueprint, setBlueprint] = useState<VideoBlueprint | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  const copyPrompt = async (prompt: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex((current) => (current === index ? null : current)), 2000);
+    } catch (err) {
+      console.error('Failed to copy prompt', err);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!script.trim()) return;
@@ -52,13 +60,13 @@ export default function App() {
   const exportEDL = () => {
     if (!blueprint) return;
     const edl = generateEDL(blueprint);
-    downloadFile(edl, `${blueprint.title.replace(/\s+/g, '_')}.edl`, 'text/plain');
+    downloadFile(edl, `${sanitizeFileName(blueprint.title)}.edl`, 'text/plain');
   };
 
   const exportXML = () => {
     if (!blueprint) return;
     const xml = generateXML(blueprint);
-    downloadFile(xml, `${blueprint.title.replace(/\s+/g, '_')}.xml`, 'text/xml');
+    downloadFile(xml, `${sanitizeFileName(blueprint.title)}.xml`, 'text/xml');
   };
 
   return (
@@ -261,13 +269,14 @@ export default function App() {
                         <div className="p-4 bg-black text-[#00FF00] font-mono text-[10px] leading-relaxed border-2 border-black">
                           {seg.veoPrompt}
                         </div>
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(seg.veoPrompt);
-                          }}
-                          className="w-full py-2 bg-white border-2 border-black text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-[#00FF00] transition-colors active:translate-y-0.5"
+                        <button
+                          onClick={() => copyPrompt(seg.veoPrompt, i)}
+                          className={cn(
+                            "w-full py-2 border-2 border-black text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-colors active:translate-y-0.5",
+                            copiedIndex === i ? "bg-[#00FF00]" : "bg-white hover:bg-[#00FF00]"
+                          )}
                         >
-                          Copy Prompt
+                          {copiedIndex === i ? 'Copied!' : 'Copy Prompt'}
                         </button>
                       </div>
                     </motion.div>

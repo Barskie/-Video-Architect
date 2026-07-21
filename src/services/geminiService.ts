@@ -1,8 +1,34 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { VideoBlueprint } from "../types";
+import { AssetSegment, VideoBlueprint } from "../types";
+
+const MODEL = "gemini-3.1-pro-preview";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+
+const SEARCH_LINK_KEYS = ["youtube", "tiktok", "giphy", "movieClips", "pexels"] as const;
+
+function isAssetSegment(value: unknown): value is AssetSegment {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const seg = value as AssetSegment;
+  return (
+    typeof seg.timestamp === "string" &&
+    typeof seg.segment === "string" &&
+    typeof seg.visualConcept === "string" &&
+    typeof seg.primarySubject === "string" &&
+    Array.isArray(seg.stockQuery) &&
+    seg.stockQuery.every((q) => typeof q === "string") &&
+    typeof seg.memeReference === "string" &&
+    typeof seg.veoPrompt === "string" &&
+    typeof seg.audioVibe === "string" &&
+    !!seg.searchLinks &&
+    typeof seg.searchLinks === "object" &&
+    SEARCH_LINK_KEYS.every((key) => typeof seg.searchLinks[key] === "string")
+  );
+}
 
 function isVideoBlueprint(value: unknown): value is VideoBlueprint {
   if (!value || typeof value !== "object") {
@@ -13,7 +39,9 @@ function isVideoBlueprint(value: unknown): value is VideoBlueprint {
   return (
     typeof data.title === "string" &&
     typeof data.overallTone === "string" &&
-    Array.isArray(data.segments)
+    Array.isArray(data.segments) &&
+    data.segments.length > 0 &&
+    data.segments.every(isAssetSegment)
   );
 }
 
@@ -23,7 +51,7 @@ export async function analyzeScript(script: string): Promise<VideoBlueprint> {
   }
 
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: MODEL,
     contents: `Act as a High-Speed Video Production Architect. 
     Your goal is to create a production blueprint that allows for rapid editing and maximum viewer retention.
     
@@ -82,14 +110,18 @@ export async function analyzeScript(script: string): Promise<VideoBlueprint> {
     }
   });
 
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(response.text || "{}");
-    if (!isVideoBlueprint(parsed)) {
-      throw new Error("Gemini response shape did not match VideoBlueprint.");
-    }
-    return parsed;
+    parsed = JSON.parse(response.text || "{}");
   } catch (e) {
     console.error("Failed to parse Gemini response", e);
-    throw new Error("Failed to analyze script");
+    throw new Error("Gemini returned invalid JSON. Please try again.");
   }
+
+  if (!isVideoBlueprint(parsed)) {
+    console.error("Gemini response shape did not match VideoBlueprint", parsed);
+    throw new Error("Gemini returned an incomplete blueprint. Please try again.");
+  }
+
+  return parsed;
 }

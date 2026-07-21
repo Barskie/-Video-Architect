@@ -3,6 +3,20 @@ import { VideoBlueprint } from "../types";
 const FPS = 24;
 const FALLBACK_SEGMENT_SECONDS = 3;
 
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+export function sanitizeFileName(name: string): string {
+  const cleaned = name.replace(/[^a-z0-9-_]+/gi, "_").replace(/^_+|_+$/g, "");
+  return cleaned || "blueprint";
+}
+
 function parseTimestampToFrames(timestamp: string): number {
   const parts = timestamp.split(":").map(Number);
   if (parts.some(Number.isNaN)) {
@@ -71,7 +85,7 @@ export function generateXML(blueprint: VideoBlueprint): string {
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <xmeml version="5">
   <sequence>
-    <name>${blueprint.title}</name>
+    <name>${escapeXml(blueprint.title)}</name>
     <rate>
       <timebase>24</timebase>
     </rate>
@@ -84,7 +98,7 @@ export function generateXML(blueprint: VideoBlueprint): string {
     
     xml += `
           <clipitem id="clip-${index}">
-            <name>${seg.primarySubject.substring(0, 20)}</name>
+            <name>${escapeXml(seg.primarySubject.substring(0, 20))}</name>
             <start>${start}</start>
             <end>${end}</end>
             <in>0</in>
@@ -105,7 +119,9 @@ export function generateXML(blueprint: VideoBlueprint): string {
 export function downloadFile(content: string, fileName: string, contentType: string) {
   const a = document.createElement("a");
   const file = new Blob([content], { type: contentType });
-  a.href = URL.createObjectURL(file);
+  const url = URL.createObjectURL(file);
+  a.href = url;
   a.download = fileName;
   a.click();
+  URL.revokeObjectURL(url);
 }
