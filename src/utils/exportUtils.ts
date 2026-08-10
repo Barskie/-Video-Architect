@@ -1,26 +1,53 @@
-import { VideoBlueprint } from "../types";
+import type { VideoBlueprint } from "../types";
 
 const FPS = 24;
 const FALLBACK_SEGMENT_SECONDS = 3;
 
+function singleLine(value: string, maxLength: number): string {
+  return value.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, maxLength);
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+export function safeExportFileName(value: string, extension: "edl" | "xml"): string {
+  const base = value
+    .normalize("NFKC")
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+    .replace(/[. ]+$/g, "")
+    .trim()
+    .slice(0, 100);
+  return `${base || "video_blueprint"}.${extension}`;
+}
+
 function parseTimestampToFrames(timestamp: string): number {
-  const parts = timestamp.split(":").map(Number);
-  if (parts.some(Number.isNaN)) {
+  const parts = timestamp.trim().split(":").map(Number);
+  if (parts.some((value) => !Number.isInteger(value) || value < 0)) {
     return 0;
   }
 
   if (parts.length === 4) {
     const [hh, mm, ss, ff] = parts;
+    if (mm > 59 || ss > 59 || ff >= FPS) return 0;
     return (((hh * 60 + mm) * 60 + ss) * FPS) + ff;
   }
 
   if (parts.length === 3) {
     const [hh, mm, ss] = parts;
+    if (mm > 59 || ss > 59) return 0;
     return (((hh * 60 + mm) * 60 + ss) * FPS);
   }
 
   if (parts.length === 2) {
     const [mm, ss] = parts;
+    if (ss > 59) return 0;
     return ((mm * 60 + ss) * FPS);
   }
 
@@ -51,7 +78,7 @@ function getSegmentRange(blueprint: VideoBlueprint, index: number): { start: num
 }
 
 export function generateEDL(blueprint: VideoBlueprint): string {
-  let edl = `TITLE: ${blueprint.title}\nFCM: NON-DROP FRAME\n\n`;
+  let edl = `TITLE: ${singleLine(blueprint.title, 100)}\nFCM: NON-DROP FRAME\n\n`;
   
   blueprint.segments.forEach((seg, index) => {
     const { start, end } = getSegmentRange(blueprint, index);
@@ -60,8 +87,8 @@ export function generateEDL(blueprint: VideoBlueprint): string {
     
     const clipNum = (index + 1).toString().padStart(3, "0");
     edl += `${clipNum}  AX       V     C        ${startTime} ${endTime} ${startTime} ${endTime}\n`;
-    edl += `* FROM CLIP NAME: ${seg.primarySubject.substring(0, 30)}\n`;
-    edl += `* COMMENT: ${seg.visualConcept.substring(0, 50)}\n\n`;
+    edl += `* FROM CLIP NAME: ${singleLine(seg.primarySubject, 30)}\n`;
+    edl += `* COMMENT: ${singleLine(seg.visualConcept, 50)}\n\n`;
   });
   
   return edl;
@@ -71,7 +98,7 @@ export function generateXML(blueprint: VideoBlueprint): string {
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <xmeml version="5">
   <sequence>
-    <name>${blueprint.title}</name>
+    <name>${escapeXml(singleLine(blueprint.title, 100))}</name>
     <rate>
       <timebase>24</timebase>
     </rate>
@@ -84,7 +111,7 @@ export function generateXML(blueprint: VideoBlueprint): string {
     
     xml += `
           <clipitem id="clip-${index}">
-            <name>${seg.primarySubject.substring(0, 20)}</name>
+            <name>${escapeXml(singleLine(seg.primarySubject, 20))}</name>
             <start>${start}</start>
             <end>${end}</end>
             <in>0</in>
@@ -105,7 +132,12 @@ export function generateXML(blueprint: VideoBlueprint): string {
 export function downloadFile(content: string, fileName: string, contentType: string) {
   const a = document.createElement("a");
   const file = new Blob([content], { type: contentType });
-  a.href = URL.createObjectURL(file);
+  const url = URL.createObjectURL(file);
+  a.href = url;
   a.download = fileName;
+  a.hidden = true;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }

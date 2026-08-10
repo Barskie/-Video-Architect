@@ -19,8 +19,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { analyzeScript } from './services/geminiService';
-import { VideoBlueprint } from './types';
-import { generateEDL, generateXML, downloadFile } from './utils/exportUtils';
+import type { AnalysisUsage, VideoBlueprint } from './types';
+import { generateEDL, generateXML, downloadFile, safeExportFileName } from './utils/exportUtils';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -32,6 +32,8 @@ export default function App() {
   const [script, setScript] = useState('');
   const [loading, setLoading] = useState(false);
   const [blueprint, setBlueprint] = useState<VideoBlueprint | null>(null);
+  const [usage, setUsage] = useState<AnalysisUsage | null>(null);
+  const [includeTrends, setIncludeTrends] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
@@ -39,8 +41,9 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const result = await analyzeScript(script);
-      setBlueprint(result);
+      const result = await analyzeScript(script, includeTrends);
+      setBlueprint(result.blueprint);
+      setUsage(result.usage);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze script. Please try again.');
       console.error(err);
@@ -52,13 +55,13 @@ export default function App() {
   const exportEDL = () => {
     if (!blueprint) return;
     const edl = generateEDL(blueprint);
-    downloadFile(edl, `${blueprint.title.replace(/\s+/g, '_')}.edl`, 'text/plain');
+    downloadFile(edl, safeExportFileName(blueprint.title, 'edl'), 'text/plain');
   };
 
   const exportXML = () => {
     if (!blueprint) return;
     const xml = generateXML(blueprint);
-    downloadFile(xml, `${blueprint.title.replace(/\s+/g, '_')}.xml`, 'text/xml');
+    downloadFile(xml, safeExportFileName(blueprint.title, 'xml'), 'text/xml');
   };
 
   return (
@@ -90,10 +93,30 @@ export default function App() {
               <textarea
                 value={script}
                 onChange={(e) => setScript(e.target.value)}
+                maxLength={20000}
                 placeholder="Paste your raw video script here... (e.g. 'In a world where AI takes over...')"
                 className="w-full h-64 p-4 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all resize-none font-mono text-sm"
               />
+              <div className="mt-2 text-right font-mono text-[10px] opacity-50">
+                {script.length.toLocaleString()} / 20,000
+              </div>
             </section>
+
+            <label className="flex items-start gap-3 p-3 bg-white border-2 border-black text-xs font-bold cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeTrends}
+                onChange={(event) => setIncludeTrends(event.target.checked)}
+                disabled={loading}
+                className="mt-0.5 accent-black"
+              />
+              <span>
+                Live trend research
+                <span className="block mt-1 font-normal opacity-60">
+                  Uses billable Google Search grounding. Off is faster and cheaper.
+                </span>
+              </span>
+            </label>
 
             <button
               onClick={handleGenerate}
@@ -124,6 +147,12 @@ export default function App() {
 
             {blueprint && (
               <section className="space-y-4 pt-8 border-t-2 border-black/10">
+                {usage && (
+                  <div className="text-[10px] font-bold uppercase leading-relaxed opacity-60">
+                    {usage.model} · {usage.totalTokens?.toLocaleString() ?? '—'} tokens
+                    {usage.usedLiveSearch ? ' · live search used' : ' · no paid search'}
+                  </div>
+                )}
                 <h3 className="text-xs font-black uppercase tracking-widest opacity-50">Export Timeline</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <button

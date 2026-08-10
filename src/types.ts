@@ -21,3 +21,17 @@ export interface VideoBlueprint {
   overallTone: string;
   segments: AssetSegment[];
 }
+
+export interface AnalysisUsage {
+  model: string;
+  promptTokens?: number;
+  outputTokens?: number;
+  thinkingTokens?: number;
+  totalTokens?: number;
+  usedLiveSearch: boolean;
+}
+
+export interface AnalysisResult {
+  blueprint: VideoBlueprint;
+  usage: AnalysisUsage;
+}
